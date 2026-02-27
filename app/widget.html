@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Record Payment</title>
+    <script src="https://live.zwidgets.com/js-sdk/1.5/ZohoEmbededAppSDK.min.js"></script>
+    <script src="app.js" defer></script>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 13px;
+        color: #2d2d2d;
+        background: #f4f6f9;
+        padding: 16px;
+      }
+
+      .widget-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #e1e5eb;
+      }
+
+      .widget-header h2 {
+        font-size: 15px;
+        font-weight: 600;
+        color: #1a1a2e;
+      }
+
+      .badge {
+        background: #e8f0fe;
+        color: #1967d2;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 12px;
+      }
+
+      /* ── Notification bar ── */
+      #notification {
+        display: none;
+        padding: 10px 14px;
+        border-radius: 6px;
+        font-size: 13px;
+        margin-bottom: 14px;
+        font-weight: 500;
+      }
+      #notification.success { background: #e6f4ea; color: #1e7e34; border: 1px solid #b7dfbf; }
+      #notification.error   { background: #fce8e6; color: #c5221f; border: 1px solid #f5c6c5; }
+
+      /* ── Loading overlay ── */
+      #loadingOverlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(255,255,255,0.75);
+        z-index: 999;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+      #loadingOverlay.active { display: flex; }
+      .spinner {
+        width: 32px; height: 32px;
+        border: 3px solid #e1e5eb;
+        border-top-color: #1967d2;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* ── Sections ── */
+      .section {
+        background: #fff;
+        border: 1px solid #e1e5eb;
+        border-radius: 8px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+      }
+
+      .section-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: #5f6368;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 12px;
+      }
+
+      /* ── Form grid ── */
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px 14px;
+      }
+
+      .form-group { display: flex; flex-direction: column; gap: 4px; }
+      .form-group.full { grid-column: 1 / -1; }
+
+      label {
+        font-size: 11px;
+        font-weight: 600;
+        color: #5f6368;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+
+      label .req { color: #c5221f; margin-left: 2px; }
+
+      input[type="text"],
+      input[type="number"],
+      input[type="date"],
+      select,
+      textarea {
+        width: 100%;
+        padding: 7px 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 5px;
+        font-size: 13px;
+        color: #2d2d2d;
+        background: #fff;
+        transition: border-color 0.15s, box-shadow 0.15s;
+        outline: none;
+      }
+
+      input:focus, select:focus, textarea:focus {
+        border-color: #1967d2;
+        box-shadow: 0 0 0 3px rgba(25,103,210,0.12);
+      }
+
+      input.invalid, select.invalid, textarea.invalid {
+        border-color: #c5221f;
+        box-shadow: 0 0 0 3px rgba(197,34,31,0.1);
+      }
+
+      textarea { resize: vertical; min-height: 64px; }
+
+      /* ── Invoice rows ── */
+      #invoiceRows { display: flex; flex-direction: column; gap: 8px; }
+
+      .invoice-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr auto;
+        gap: 8px;
+        align-items: end;
+        background: #f8f9fb;
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #e8eaed;
+      }
+
+      .invoice-row .form-group { margin: 0; }
+
+      .btn-remove {
+        background: none;
+        border: 1px solid #d1d5db;
+        border-radius: 5px;
+        width: 30px; height: 30px;
+        cursor: pointer;
+        color: #9aa0a6;
+        font-size: 16px;
+        line-height: 1;
+        display: flex; align-items: center; justify-content: center;
+        transition: background 0.15s, color 0.15s;
+      }
+      .btn-remove:hover { background: #fce8e6; color: #c5221f; border-color: #f5c6c5; }
+
+      .btn-add-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 8px;
+        background: none;
+        border: 1px dashed #1967d2;
+        border-radius: 5px;
+        color: #1967d2;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 5px 12px;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .btn-add-row:hover { background: #e8f0fe; }
+
+      /* ── Actions ── */
+      .form-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        margin-top: 4px;
+      }
+
+      .btn {
+        padding: 8px 20px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: opacity 0.15s, transform 0.1s;
+      }
+      .btn:active { transform: scale(0.98); }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+      .btn-primary {
+        background: #1967d2;
+        color: #fff;
+      }
+      .btn-primary:hover:not(:disabled) { background: #1558b0; }
+
+      .btn-secondary {
+        background: #f1f3f4;
+        color: #444;
+        border: 1px solid #d1d5db;
+      }
+      .btn-secondary:hover:not(:disabled) { background: #e8eaed; }
+
+      /* ── Summary amount chip ── */
+      #amountSummary {
+        display: none;
+        font-size: 11px;
+        color: #5f6368;
+        margin-top: 6px;
+      }
+      #amountSummary span { font-weight: 700; color: #1e7e34; }
+    </style>
+  </head>
+  <body>
+
+    <div id="loadingOverlay">
+      <div class="spinner"></div>
+      <p style="font-size:13px;color:#5f6368;">Recording payment…</p>
+    </div>
+
+    <div class="widget-header">
+      <h2>Record Payment</h2>
+      <span class="badge">Zoho Books</span>
+    </div>
+
+    <div id="notification"></div>
+
+    <form id="paymentForm" novalidate>
+
+      <!-- ── Core Details ── -->
+      <div class="section">
+        <div class="section-title">Payment Details</div>
+        <div class="form-grid">
+
+          <div class="form-group">
+            <label for="date">Date <span class="req">*</span></label>
+            <input type="date" id="date" name="date" required />
+          </div>
+
+          <div class="form-group">
+            <label for="amount">Amount <span class="req">*</span></label>
+            <input type="number" id="amount" name="amount" min="0" step="0.01" placeholder="0.00" required />
+          </div>
+
+          <div class="form-group">
+            <label for="payment_mode">Payment Mode <span class="req">*</span></label>
+            <select id="payment_mode" name="payment_mode" required>
+              <option value="">— Select —</option>
+              <option value="cash">Cash</option>
+              <option value="check">Check</option>
+              <option value="creditcard">Credit Card</option>
+              <option value="banktransfer">Bank Transfer</option>
+              <option value="bankremittance">Bank Remittance</option>
+              <option value="autotransaction">Auto Transaction</option>
+              <option value="others">Others</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="reference_number">Reference Number</label>
+            <input type="text" id="reference_number" name="reference_number" placeholder="e.g. INV-384" />
+          </div>
+
+          <div class="form-group full">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" placeholder="Payment notes…"></textarea>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── Invoice Application ── -->
+      <div class="section">
+        <div class="section-title">Apply to Invoices</div>
+
+        <div id="invoiceRows">
+          <!-- rows injected by JS -->
+        </div>
+
+        <button type="button" class="btn-add-row" id="addInvoiceRow">
+          + Add Invoice
+        </button>
+
+        <div id="amountSummary">
+          Total applied: <span id="appliedTotal">0.00</span>
+        </div>
+      </div>
+
+      <!-- ── Additional Info ── -->
+      <div class="section">
+        <div class="section-title">Additional Info</div>
+        <div class="form-grid">
+
+          <div class="form-group">
+            <label for="exchange_rate">Exchange Rate</label>
+            <input type="number" id="exchange_rate" name="exchange_rate" min="0" step="0.0001" value="1" />
+          </div>
+
+          <div class="form-group">
+            <label for="bank_charges">Bank Charges</label>
+            <input type="number" id="bank_charges" name="bank_charges" min="0" step="0.01" placeholder="0.00" />
+          </div>
+
+          <div class="form-group">
+            <label for="tax_amount_withheld">Tax Amount Withheld</label>
+            <input type="number" id="tax_amount_withheld" name="tax_amount_withheld" min="0" step="0.01" placeholder="0.00" />
+          </div>
+
+          <div class="form-group">
+            <label for="account_id">Account ID</label>
+            <input type="text" id="account_id" name="account_id" placeholder="Bank / Cash account ID" />
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── Actions ── -->
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="resetBtn">Reset</button>
+        <button type="submit" class="btn btn-primary" id="submitBtn">Record Payment</button>
+      </div>
+
+    </form>
+
+    <script>
+      // ── Utilities ────────────────────────────────────────────────
+      function $(id) { return document.getElementById(id); }
+
+      function showNotification(message, type) {
+        var el = $("notification");
+        el.textContent = message;
+        el.className = type;
+        el.style.display = "block";
+        setTimeout(function () { el.style.display = "none"; }, 5000);
+      }
+
+      function setLoading(active) {
+        $("loadingOverlay").classList.toggle("active", active);
+        $("submitBtn").disabled = active;
+      }
+
+      function today() {
+        return new Date().toISOString().split("T")[0];
+      }
+
+      // ── Invoice Rows ─────────────────────────────────────────────
+      var invoiceRowCount = 0;
+
+      function addInvoiceRow(invoiceId, amountApplied) {
+        invoiceRowCount++;
+        var id = invoiceRowCount;
+        var container = $("invoiceRows");
+
+        var row = document.createElement("div");
+        row.className = "invoice-row";
+        row.dataset.rowId = id;
+        row.innerHTML =
+          '<div class="form-group">' +
+            '<label>Invoice ID</label>' +
+            '<input type="text" class="inv-id" placeholder="Invoice ID" value="' + (invoiceId || "") + '" />' +
+          '</div>' +
+          '<div class="form-group">' +
+            '<label>Amount Applied</label>' +
+            '<input type="number" class="inv-amt" min="0" step="0.01" placeholder="0.00" value="' + (amountApplied || "") + '" />' +
+          '</div>' +
+          '<button type="button" class="btn-remove" title="Remove row">&#x2715;</button>';
+
+        row.querySelector(".btn-remove").addEventListener("click", function () {
+          row.remove();
+          updateAmountSummary();
+          toggleAmountSummary();
+        });
+
+        row.querySelector(".inv-amt").addEventListener("input", function () {
+          updateAmountSummary();
+        });
+
+        container.appendChild(row);
+        toggleAmountSummary();
+      }
+
+      function getInvoiceRows() {
+        var rows = document.querySelectorAll(".invoice-row");
+        var result = [];
+        rows.forEach(function (row) {
+          var invId  = row.querySelector(".inv-id").value.trim();
+          var invAmt = parseFloat(row.querySelector(".inv-amt").value);
+          if (invId && invAmt > 0) {
+            result.push({ invoice_id: invId, amount_applied: invAmt });
+          }
+        });
+        return result;
+      }
+
+      function updateAmountSummary() {
+        var total = 0;
+        document.querySelectorAll(".inv-amt").forEach(function (inp) {
+          total += parseFloat(inp.value) || 0;
+        });
+        $("appliedTotal").textContent = total.toFixed(2);
+      }
+
+      function toggleAmountSummary() {
+        var rows = document.querySelectorAll(".invoice-row");
+        $("amountSummary").style.display = rows.length > 0 ? "block" : "none";
+      }
+
+      $("addInvoiceRow").addEventListener("click", function () {
+        addInvoiceRow();
+      });
+
+      // ── Validation ───────────────────────────────────────────────
+      function clearValidation() {
+        document.querySelectorAll(".invalid").forEach(function (el) {
+          el.classList.remove("invalid");
+        });
+      }
+
+      function validateForm() {
+        clearValidation();
+        var valid = true;
+
+        var required = [
+          { id: "date",         label: "Date" },
+          { id: "payment_mode", label: "Payment Mode" }
+        ];
+
+        required.forEach(function (field) {
+          var el = $(field.id);
+          if (!el.value.trim()) {
+            el.classList.add("invalid");
+            valid = false;
+          }
+        });
+
+        var amountEl = $("amount");
+        var amountVal = parseFloat(amountEl.value);
+        if (isNaN(amountVal) || amountVal <= 0) {
+          amountEl.classList.add("invalid");
+          valid = false;
+        }
+
+        return valid;
+      }
+
+      // ── Build Payload ─────────────────────────────────────────────
+      function buildPayload(customerId) {
+        var invoices     = getInvoiceRows();
+        var bankCharges  = parseFloat($("bank_charges").value) || 0;
+        var taxWithheld  = parseFloat($("tax_amount_withheld").value) || 0;
+        var exchangeRate = parseFloat($("exchange_rate").value) || 1;
+        var accountId    = $("account_id").value.trim();
+        var refNum       = $("reference_number").value.trim();
+        var desc         = $("description").value.trim();
+
+        // Only required fields sent by default
+        var payload = {
+          customer_id:  customerId || "",
+          payment_mode: $("payment_mode").value,
+          amount:       parseFloat($("amount").value),
+          date:         $("date").value
+        };
+
+        // Zoho Books requires invoice_id + amount_applied at the top level
+        // AND inside the invoices array (both are needed)
+        if (invoices.length > 0) {
+          payload.invoice_id     = invoices[0].invoice_id;
+          payload.amount_applied = invoices[0].amount_applied;
+          payload.invoices       = invoices;
+        }
+
+        // Optional fields — only included when non-default / non-empty
+        if (exchangeRate !== 1)   payload.exchange_rate       = exchangeRate;
+        if (bankCharges  > 0)     payload.bank_charges        = bankCharges;
+        if (taxWithheld  > 0)     payload.tax_amount_withheld = taxWithheld;
+        if (accountId)            payload.account_id          = accountId;
+        if (refNum)               payload.reference_number    = refNum;
+        if (desc)                 payload.description         = desc;
+
+        return payload;
+      }
+
+      // ── Reset ─────────────────────────────────────────────────────
+      function resetForm() {
+        $("paymentForm").reset();
+        $("date").value = today();
+        $("exchange_rate").value = "1";
+        $("invoiceRows").innerHTML = "";
+        toggleAmountSummary();
+        clearValidation();
+        $("notification").style.display = "none";
+      }
+
+      $("resetBtn").addEventListener("click", resetForm);
+
+      // ── Submit ────────────────────────────────────────────────────
+      $("paymentForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+        if (!validateForm()) {
+          showNotification("Please fill in all required fields.", "error");
+          return;
+        }
+
+        // Payload is built here; app.js will override this handler
+        // and use window.buildPaymentPayload() to get the object.
+        var payload = buildPayload(window.__customerId || "");
+        console.log("Payment payload:", JSON.stringify(payload, null, 2));
+
+        // Dispatch a custom event so app.js can intercept without
+        // replacing this entire file.
+        var event = new CustomEvent("recordPayment", { detail: payload });
+        document.dispatchEvent(event);
+      });
+
+      // ── Expose helpers for app.js ─────────────────────────────────
+      window.buildPaymentPayload = buildPayload;
+      window.showPaymentNotification = showNotification;
+      window.setPaymentLoading = setLoading;
+      window.resetPaymentForm = resetForm;
+
+      // ── Init ──────────────────────────────────────────────────────
+      $("date").value = today();
+      addInvoiceRow(); // start with one invoice row
+    </script>
+  </body>
+</html>
